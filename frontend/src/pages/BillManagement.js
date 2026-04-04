@@ -86,6 +86,11 @@ export default function BillManagement() {
       const { data } = await api.post("/admission/generate-bills", payload);
       setGenResult(data);
       loadBills();
+      setTimeout(() => {
+        setShowGenerate(false);
+        setGenResult(null);
+        setGenForm({ user_id: "", academic_year: "2024-25", program_name: "", total_course_fees: "", installments: "3" });
+      }, 1500);
     } catch (err) {
       setGenResult({ error: err.response?.data?.detail || "Failed to generate bills" });
     }
