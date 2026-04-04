@@ -1,0 +1,124 @@
+{
+  "theme": "Light",
+  "archetype": "4 (Swiss & High-Contrast)",
+  "emotional_tone": "Authoritative, Clear, Functional, Objective",
+  "typography": {
+    "fonts": {
+      "headings": {
+        "family": "Cabinet Grotesk, sans-serif",
+        "weight": "font-black or font-extrabold",
+        "description": "Used for all main headings (H1-H3). Must be tight tracking."
+      },
+      "body": {
+        "family": "IBM Plex Sans, sans-serif",
+        "weight": "font-normal to font-medium",
+        "description": "Used for all standard text, metrics, data tables, and forms."
+      },
+      "mono": {
+        "family": "IBM Plex Mono, monospace",
+        "description": "Used for invoice numbers, receipt IDs, and raw data."
+      }
+    },
+    "scale": {
+      "h1": "text-4xl sm:text-5xl tracking-tight leading-none",
+      "h2": "text-2xl sm:text-3xl tracking-tight",
+      "h3": "text-xl sm:text-2xl tracking-tight",
+      "h4": "text-lg sm:text-xl",
+      "body": "text-sm sm:text-base leading-relaxed",
+      "labels": "text-xs tracking-[0.2em] uppercase font-bold text-muted-foreground"
+    }
+  },
+  "colors": {
+    "background": "#FFFFFF",
+    "surface": "#F9FAFB",
+    "text_primary": "#111827",
+    "text_secondary": "#6B7280",
+    "primary_accent": "#002FA7",
+    "status": {
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6"
+    },
+    "borders": "#E5E7EB",
+    "chart_palette": [
+      "#002FA7",
+      "#10B981",
+      "#F59E0B",
+      "#EF4444",
+      "#6366F1"
+    ]
+  },
+  "layout_and_spacing": {
+    "strategy": "The 'Control Room' Grid",
+    "container_padding": "p-6 md:p-8 lg:p-12",
+    "gap_system": "gap-4 or gap-6 for tight data density",
+    "dashboard_grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4",
+    "card_structure": "Flat backgrounds (bg-white or bg-gray-50), 1px solid border (border-border), no shadow by default. Sharp or max 8px (rounded-md) border radius."
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#002FA7] text-white hover:bg-[#002FA7]/90 rounded-md font-medium px-4 py-2 transition-colors",
+      "secondary": "bg-white text-[#111827] border border-border hover:bg-gray-50 rounded-md font-medium px-4 py-2 transition-colors",
+      "danger": "bg-[#EF4444] text-white hover:bg-[#EF4444]/90 rounded-md px-4 py-2 transition-colors"
+    },
+    "cards": {
+      "metric_card": "p-6 border border-border rounded-md flex flex-col gap-2 bg-white",
+      "chart_card": "p-6 border border-border rounded-md flex flex-col gap-4 bg-white col-span-2 lg:col-span-3",
+      "table_card": "border border-border rounded-md overflow-hidden bg-white"
+    },
+    "inputs": {
+      "default": "border border-border rounded-md bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-[#002FA7] focus:outline-none"
+    },
+    "navigation": {
+      "header": "sticky top-0 z-50 w-full border-b border-border bg-white/70 backdrop-blur-xl",
+      "sidebar_or_tabs": "Use horizontal segmented controls or a minimal vertical sidebar for navigation."
+    },
+    "charts": {
+      "library": "Recharts or Shadcn Charts",
+      "style": "Minimalist axes, solid fills with no gradients, tooltips should have sharp borders and solid backgrounds."
+    }
+  },
+  "icons": {
+    "library": "lucide-react",
+    "style": "Clean, stroke-based, minimal. Use standard sizes (w-5 h-5 for inline, w-8 h-8 for metric cards)."
+  },
+  "interactions": {
+    "hover": "Background color shifts on buttons/rows, slight border darkening. NO aggressive scaling or large shadows.",
+    "focus": "High contrast ring (e.g., focus:ring-2 focus:ring-[#002FA7]) on all interactive elements.",
+    "transitions": "Use short duration (duration-200) ease-in-out for color and border changes."
+  },
+  "media": {
+    "images": [
+      {
+        "category": "university_logo",
+        "url": "https://images.pexels.com/photos/18257698/pexels-photo-18257698.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Use as a placeholder for the college logo in the header or login screen."
+      },
+      {
+        "category": "student_avatar",
+        "url": "https://images.unsplash.com/photo-1655977237812-ee6beb137203?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MTJ8MHwxfHNlYXJjaHwxfHx1bml2ZXJzaXR5JTIwc3R1ZGVudCUyMHBvcnRyYWl0fGVufDB8fHx8MTc3NTMxNTQ0NHww&ixlib=rb-4.1.0&q=85",
+        "description": "Use for the user profile avatar in the navigation bar."
+      },
+      {
+        "category": "hero_background",
+        "url": "https://images.pexels.com/photos/27623242/pexels-photo-27623242.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Optional background for the Applicant portal login or brochure landing page. Use heavy white overlay (bg-white/80) if text is placed on top."
+      }
+    ]
+  },
+  "accessibility": {
+    "test_ids": "All buttons, inputs, links, and forms MUST have a kebab-case data-testid attribute.",
+    "contrast": "Ensure all text meets APCA/WCAG standards. Use pure white or pure black against primary accents."
+  },
+  "instructions_to_main_agent": [
+    "Implement the UI using React, Tailwind CSS, and Shadcn UI components.",
+    "Enforce the 'Swiss & High-Contrast' aesthetic: avoid gradients, soft shadows, and rounded pill shapes. Stick to crisp borders, sharp grids, and solid colors.",
+    "Integrate 'Cabinet Grotesk' for Headings and 'IBM Plex Sans' for Body text. Set them in index.css.",
+    "The Dashboard must feature a 'Control Room' grid layout with an Academic Year filter dropdown at the top right.",
+    "Include specific visualizations for Paid vs Unpaid Bills (Pie/Donut chart) and Revenue (Bar chart).",
+    "Use standard Lucide icons for metrics (e.g., Users, Banknotes, Receipt, RefreshCw).",
+    "Apply strict test IDs to all interactive elements for automated testing.",
+    "For user pages (Applicant/Student), maintain a clean receipt view and simple Razorpay integration mock interface."
+  ]
+}
