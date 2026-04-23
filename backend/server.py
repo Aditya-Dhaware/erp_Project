@@ -546,6 +546,119 @@ async def verify_payment(req: VerifyPaymentRequest, background_tasks: Background
 
     return {"message": "Payment verified successfully", "receipt": row_to_dict(receipt)}
 
+# ── Razorpay Webhook (paste this URL in Razorpay Dashboard) ──
+# URL: http://<YOUR_SERVER_IP>:8000/api/payments/razorpay-webhook
+
+@api_router.post("/payments/razorpay-webhook")
+async def razorpay_webhook(request: Request, background_tasks: BackgroundTasks):
+    """
+    Razorpay calls this endpoint automatically after every payment event.
+    Paste this URL in Razorpay Dashboard → Settings → Webhooks.
+    Set the Webhook Secret there and add it to .env as RAZORPAY_WEBHOOK_SECRET.
+    """
+    # ── 1. Verify Razorpay webhook signature ──
+    webhook_secret = os.environ.get('RAZORPAY_WEBHOOK_SECRET', '')
+    raw_body = await request.body()
+
+    if webhook_secret:
+        received_signature = request.headers.get('X-Razorpay-Signature', '')
+        expected_signature = hmac.new(
+            webhook_secret.encode('utf-8'),
+            raw_body,
+            hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected_signature, received_signature):
+            logger.warning("[RazorpayWebhook] Invalid signature — request rejected.")
+            raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    # ── 2. Parse event payload ──
+    try:
+        event = json.loads(raw_body)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    event_name = event.get('event')
+    logger.info(f"[RazorpayWebhook] Received event: {event_name}")
+
+    # ── 3. Handle payment.captured event only ──
+    if event_name != 'payment.captured':
+        return {"status": "ignored", "event": event_name}
+
+    payment_entity = event.get('payload', {}).get('payment', {}).get('entity', {})
+    razorpay_order_id = payment_entity.get('order_id')
+    razorpay_payment_id = payment_entity.get('id')
+
+    if not razorpay_order_id or not razorpay_payment_id:
+        raise HTTPException(status_code=400, detail="Missing order_id or payment_id in webhook payload")
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        payment = await conn.fetchrow(
+            "SELECT * FROM payments WHERE razorpay_order_id = $1", razorpay_order_id
+        )
+        if not payment:
+            logger.warning(f"[RazorpayWebhook] No payment record found for order {razorpay_order_id}")
+            return {"status": "not_found"}
+
+        bill = await conn.fetchrow("SELECT * FROM bills WHERE bill_id = $1", payment['bill_id'])
+
+        # Idempotency — skip if already processed
+        if bill['status'] == 'PAID':
+            logger.info(f"[RazorpayWebhook] Bill {bill['bill_id']} already PAID — skipping.")
+            return {"status": "already_paid"}
+
+        # ── 4. Mark payment and bill as successful ──
+        await conn.execute(
+            "UPDATE payments SET razorpay_payment_id = $1, status = 'SUCCESS' WHERE payment_id = $2",
+            razorpay_payment_id, payment['payment_id']
+        )
+        await conn.execute(
+            "UPDATE bills SET status = 'PAID', updated_at = NOW() WHERE bill_id = $1",
+            payment['bill_id']
+        )
+
+        # ── 5. Generate receipt ──
+        receipt_num = f"REC-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(payment['payment_id'])[:8].upper()}"
+        await conn.execute(
+            """INSERT INTO receipts (payment_id, bill_id, user_id, receipt_number, amount)
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT DO NOTHING""",
+            payment['payment_id'], payment['bill_id'], payment['user_id'], receipt_num, payment['amount']
+        )
+
+        # ── 6. Fire admission webhook (background) ──
+        webhook_payload = {
+            "event": "payment.success",
+            "data": {
+                "user_id": str(payment['user_id']),
+                "bill_id": str(payment['bill_id']),
+                "payment_id": str(payment['payment_id']),
+                "receipt_number": receipt_num,
+                "amount": float(payment['amount']),
+                "bill_type": bill['bill_type']
+            }
+        }
+        background_tasks.add_task(send_payment_webhook, webhook_payload)
+
+        # ── 7. Fire SIS PATCH for academic bills (background) ──
+        if bill['bill_type'] == 'ACADEMIC':
+            fee_summary = await conn.fetch(
+                "SELECT status, amount FROM bills WHERE user_id = $1 AND bill_type = 'ACADEMIC'",
+                payment['user_id']
+            )
+            total_paid = sum(float(r['amount']) for r in fee_summary if r['status'] == 'PAID')
+            total_pending = sum(float(r['amount']) for r in fee_summary if r['status'] == 'UNPAID')
+            background_tasks.add_task(send_sis_fee_update, str(payment['user_id']), total_paid, total_pending)
+
+    await log_event(
+        "RAZORPAY_WEBHOOK_PROCESSED", "SUCCESS",
+        f"Webhook processed for order {razorpay_order_id}",
+        {"razorpay_order_id": razorpay_order_id, "razorpay_payment_id": razorpay_payment_id,
+         "bill_id": str(payment['bill_id']), "bill_type": bill['bill_type']}
+    )
+
+    return {"status": "success"}
+
 @api_router.get("/payments")
 async def list_payments(academic_year: Optional[str] = None, user_id: Optional[str] = None, admin=Depends(get_current_admin)):
     pool = await get_pool()
