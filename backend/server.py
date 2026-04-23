@@ -21,12 +21,18 @@ import bcrypt
 import httpx
 
 async def send_payment_webhook(payload: dict):
-    # In production, this URL would come from os.environ.get('ADMISSION_WEBHOOK_URL')
-    webhook_url = os.environ.get('ADMISSION_WEBHOOK_URL', 'http://localhost:8001/webhook/payment-success')
+    webhook_url = os.environ.get(
+        'ADMISSION_WEBHOOK_URL',
+        'http://localhost:8001/api/v1/payments/webhook/payment-success'
+    )
+    secret = os.environ.get('ADMISSION_INTEGRATION_SECRET', 'SUPER_SECRET_TOKEN')
+    headers = {
+        "Authorization": f"Bearer {secret}",
+        "Content-Type": "application/json"
+    }
     try:
         async with httpx.AsyncClient() as client:
-            # We send a background POST request to the Admission module with the payment details
-            resp = await client.post(webhook_url, json=payload, timeout=5.0)
+            resp = await client.post(webhook_url, json=payload, headers=headers, timeout=5.0)
             print(f"[Webhook] Sent payload to {webhook_url}. Response: {resp.status_code}")
     except Exception as e:
         print(f"[Webhook] Failed to send webhook to {webhook_url}: {e}")
