@@ -1,31 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
-import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Receipt } from "lucide-react";
-
-function AdminHeader({ title, onBack }) {
-  const { user } = useAuth();
-  return (
-    <header className="sticky top-0 z-50 w-full border-b border-[#E5E7EB] bg-white/80 backdrop-blur-xl">
-      <div className="max-w-[1440px] mx-auto px-6 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="p-1.5 rounded-md hover:bg-[#F3F4F6] transition-colors" data-testid="back-btn">
-            <ArrowLeft className="w-5 h-5 text-[#6B7280]" />
-          </button>
-          <span className="text-sm font-bold tracking-tight text-[#111827]">{title}</span>
-        </div>
-        <span className="text-xs text-[#6B7280]">{user?.email}</span>
-      </div>
-    </header>
-  );
-}
+import AdminLayout from "@/components/AdminLayout";
+import { Printer } from "lucide-react";
 
 export default function ReceiptList() {
-  const navigate = useNavigate();
   const [receipts, setReceipts] = useState([]);
   const [years, setYears] = useState([]);
   const [academicYear, setAcademicYear] = useState("");
@@ -49,62 +27,69 @@ export default function ReceiptList() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]" data-testid="receipt-list-page">
-      <AdminHeader title="Receipts" onBack={() => navigate("/admin")} />
+    <AdminLayout title="Receipts">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'var(--erp-dark)' }}>Receipts</h2>
+        <select 
+          className="erp-form-control" 
+          style={{ width: '150px' }}
+          value={academicYear} 
+          onChange={(e) => setAcademicYear(e.target.value)}
+        >
+          <option value="">All Years</option>
+          {years.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
 
-      <main className="max-w-[1440px] mx-auto px-6 py-8">
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-[#111827]">Receipts</h1>
-          <Select value={academicYear} onValueChange={(v) => setAcademicYear(v === "all" ? "" : v)}>
-            <SelectTrigger className="w-[150px] border-[#E5E7EB] rounded-md text-sm" data-testid="filter-year">
-              <SelectValue placeholder="All Years" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Years</SelectItem>
-              {years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Card className="border border-[#E5E7EB] shadow-none rounded-md" data-testid="receipts-table">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Receipt #</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">User ID</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Program</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Type</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Installment</th>
-                    <th className="text-right py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Amount</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Date</th>
+      <div className="erp-card">
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead style={{ borderBottom: '1px solid var(--erp-border)', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--erp-text-muted)' }}>
+              <tr>
+                <th style={{ padding: '12px 16px' }}>Receipt #</th>
+                <th style={{ padding: '12px 16px' }}>User ID</th>
+                <th style={{ padding: '12px 16px' }}>Program</th>
+                <th style={{ padding: '12px 16px' }}>Type</th>
+                <th style={{ padding: '12px 16px' }}>Installment</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Amount</th>
+                <th style={{ padding: '12px 16px' }}>Date</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Print</th>
+              </tr>
+            </thead>
+            <tbody style={{ fontSize: '0.875rem' }}>
+              {loading ? (
+                <tr><td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: 'var(--erp-text-muted)' }}>Loading receipts...</td></tr>
+              ) : receipts.length === 0 ? (
+                <tr><td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: 'var(--erp-text-muted)' }}>No receipts found</td></tr>
+              ) : (
+                receipts.map((r) => (
+                  <tr key={r.receipt_id} style={{ borderBottom: '1px solid var(--erp-border)' }}>
+                    <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: 'var(--erp-primary)', fontWeight: 'bold' }}>{r.receipt_number}</td>
+                    <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: 'var(--erp-text-muted)' }}>{r.user_id.slice(0, 8)}...</td>
+                    <td style={{ padding: '12px 16px' }}>{r.program_name || "—"}</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <span className="erp-badge erp-badge--primary">{r.bill_type}</span>
+                    </td>
+                    <td style={{ padding: '12px 16px', color: 'var(--erp-text-muted)' }}>{r.installment_number ? `${r.installment_number}` : "—"}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 'bold' }}>₹{Number(r.amount).toLocaleString('en-IN')}</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--erp-text-muted)', fontSize: '0.8rem' }}>{new Date(r.created_at).toLocaleDateString()}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => window.open(`/receipt/${r.receipt_id}/print`, '_blank')}
+                        className="erp-btn erp-btn--ghost"
+                        style={{ padding: '8px' }}
+                        title="Print PDF"
+                      >
+                        <Printer size={16} color="var(--erp-primary)" />
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={7} className="py-12 text-center text-[#6B7280]">Loading...</td></tr>
-                  ) : receipts.length === 0 ? (
-                    <tr><td colSpan={7} className="py-12 text-center text-[#6B7280]">No receipts found</td></tr>
-                  ) : (
-                    receipts.map((r) => (
-                      <tr key={r.receipt_id} className="border-b border-[#E5E7EB] last:border-0 hover:bg-[#F9FAFB] transition-colors" data-testid={`receipt-row-${r.receipt_id}`}>
-                        <td className="py-3 px-4 font-mono text-xs font-medium text-[#002FA7]">{r.receipt_number}</td>
-                        <td className="py-3 px-4 font-mono text-xs text-[#6B7280]">{r.user_id.slice(0, 8)}...</td>
-                        <td className="py-3 px-4 text-[#111827]">{r.program_name || "—"}</td>
-                        <td className="py-3 px-4"><Badge variant="outline" className="text-xs">{r.bill_type}</Badge></td>
-                        <td className="py-3 px-4 text-[#6B7280]">{r.installment_number ? `${r.installment_number}` : "—"}</td>
-                        <td className="py-3 px-4 text-right font-mono font-medium text-[#111827]">₹{Number(r.amount).toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-[#6B7280] text-xs">{new Date(r.created_at).toLocaleDateString()}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      </main>
-    </div>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </AdminLayout>
   );
 }

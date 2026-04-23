@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, BackgroundTasks
 from starlette.middleware.cors import CORSMiddleware
 import os
 import logging
@@ -18,6 +18,38 @@ from decimal import Decimal
 from typing import Optional
 from pydantic import BaseModel, Field
 import bcrypt
+import httpx
+
+async def send_payment_webhook(payload: dict):
+    # In production, this URL would come from os.environ.get('ADMISSION_WEBHOOK_URL')
+    webhook_url = os.environ.get('ADMISSION_WEBHOOK_URL', 'http://localhost:8001/webhook/payment-success')
+    try:
+        async with httpx.AsyncClient() as client:
+            # We send a background POST request to the Admission module with the payment details
+            resp = await client.post(webhook_url, json=payload, timeout=5.0)
+            print(f"[Webhook] Sent payload to {webhook_url}. Response: {resp.status_code}")
+    except Exception as e:
+        print(f"[Webhook] Failed to send webhook to {webhook_url}: {e}")
+
+async def send_sis_fee_update(user_id: str, total_paid: float, total_pending: float):
+    """Send a PATCH request to the SIS module with updated fee totals after a successful payment."""
+    sis_base_url = os.environ.get('SIS_MODULE_URL', 'http://localhost:8002')
+    patch_url = f"{sis_base_url}/api/students/{user_id}/fees"
+    payload = {
+        "user_id": user_id,
+        "total_paid": total_paid,
+        "total_pending": total_pending,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.patch(patch_url, json=payload, timeout=5.0)
+            print(f"[SIS PATCH] Sent fee update to {patch_url}. Response: {resp.status_code}")
+            if resp.status_code >= 400:
+                print(f"[SIS PATCH] Error response body: {resp.text}")
+    except Exception as e:
+        print(f"[SIS PATCH] Failed to send fee update to {patch_url}: {e}")
+
 import jwt
 import razorpay
 
@@ -61,6 +93,20 @@ def row_to_dict(row):
 
 def rows_to_list(rows):
     return [row_to_dict(r) for r in rows]
+
+async def log_event(event_name: str, status: str, description: str = None, metadata: dict = None):
+    """Insert an audit log entry into the audit_logs table."""
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """INSERT INTO audit_logs (log_id, event_name, status, description, metadata)
+                   VALUES ($1, $2, $3, $4, $5)""",
+                str(uuid.uuid4()), event_name, status, description,
+                json.dumps(metadata) if metadata else None
+            )
+    except Exception as e:
+        logger.error(f"[AuditLog] Failed to log event '{event_name}': {e}")
 
 async def get_current_admin(request: Request):
     token = request.cookies.get("access_token")
@@ -144,7 +190,7 @@ async def seed_sample_data():
                 status = 'PAID' if i == 1 else 'UNPAID'
                 await conn.execute(
                     """INSERT INTO bills (user_id, academic_year, program_name, bill_type, amount, status, installment_number, total_installments)
-                       VALUES ($1, $2, $3, 'TUITION', $4, $5, $6, $7)""",
+                       VALUES ($1, $2, $3, 'ACADEMIC', $4, $5, $6, $7)""",
                     uid, ay, prog, per_inst, status, i, inst
                 )
 
@@ -227,6 +273,9 @@ class StudentAdmissionRequest(BaseModel):
     program_name: str
     total_course_fees: float
     installments: int
+    user_name: str
+    user_email: str
+    user_class: str
 
 @api_router.post("/admission/brochure-payment")
 async def create_brochure_bill(req: BrochurePaymentRequest):
@@ -244,7 +293,10 @@ async def create_brochure_bill(req: BrochurePaymentRequest):
                RETURNING bill_id, user_id, academic_year, program_name, bill_type, amount, status, created_at""",
             uuid.UUID(req.user_id), req.academic_year, "Brochure", req.brochure_fee_amount
         )
-    return row_to_dict(bill)
+    bill_data = row_to_dict(bill)
+    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+    bill_data["redirect_url"] = f"{frontend_url}/pay/brochure?bill_id={bill_data['bill_id']}&user_id={bill_data['user_id']}"
+    return bill_data
 
 @api_router.post("/admission/generate-bills")
 async def generate_student_bills(req: StudentAdmissionRequest):
@@ -257,22 +309,28 @@ async def generate_student_bills(req: StudentAdmissionRequest):
     bills = []
     async with pool.acquire() as conn:
         existing = await conn.fetchval(
-            "SELECT COUNT(*) FROM bills WHERE user_id = $1 AND bill_type = 'TUITION' AND academic_year = $2",
+            "SELECT COUNT(*) FROM bills WHERE user_id = $1 AND bill_type = 'ACADEMIC' AND academic_year = $2",
             uuid.UUID(req.user_id), req.academic_year
         )
         if existing > 0:
-            raise HTTPException(status_code=400, detail="Tuition bills already exist for this user and year")
+            raise HTTPException(status_code=400, detail="Academic bills already exist for this user and year")
         for i in range(1, req.installments + 1):
             amt = per_installment
             if i == req.installments and remainder != 0:
                 amt = per_installment + remainder
             bill = await conn.fetchrow(
-                """INSERT INTO bills (user_id, academic_year, program_name, bill_type, amount, status, installment_number, total_installments)
-                   VALUES ($1, $2, $3, 'TUITION', $4, 'UNPAID', $5, $6)
-                   RETURNING bill_id, user_id, academic_year, program_name, bill_type, amount, status, installment_number, total_installments, created_at""",
-                uuid.UUID(req.user_id), req.academic_year, req.program_name, amt, i, req.installments
+                """INSERT INTO bills (user_id, academic_year, user_name, user_email, program_name, user_class, bill_type, amount, status, installment_number, total_installments)
+                   VALUES ($1, $2, $3, $4, $5, $6, 'ACADEMIC', $7, 'UNPAID', $8, $9)
+                   RETURNING bill_id, user_id, academic_year, user_name, user_email, program_name, user_class, bill_type, amount, status, installment_number, total_installments, created_at""",
+                uuid.UUID(req.user_id), req.academic_year, req.user_name, req.user_email, req.program_name, req.user_class, amt, i, req.installments
             )
             bills.append(row_to_dict(bill))
+
+    await log_event(
+        "BILLS_GENERATED", "SUCCESS",
+        f"Generated {req.installments} academic bill(s) for user {req.user_id}",
+        {"user_id": req.user_id, "total_fees": req.total_course_fees, "installments": req.installments, "user_name": req.user_name}
+    )
     return {"total_fees": req.total_course_fees, "installments": req.installments, "per_installment": per_installment, "bills": bills}
 
 # ── Bills Routes ──
@@ -328,6 +386,22 @@ async def get_user_bills(user_id: str):
         rows = await conn.fetch("SELECT * FROM bills WHERE user_id = $1 ORDER BY academic_year DESC, installment_number ASC", uuid.UUID(user_id))
     return rows_to_list(rows)
 
+@api_router.get("/sis/fees/user/{user_id}")
+async def get_sis_user_fees(user_id: str):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT * FROM bills WHERE user_id = $1 AND bill_type = 'ACADEMIC'", uuid.UUID(user_id))
+    
+    bills = rows_to_list(rows)
+    total_paid = sum(b['amount'] for b in bills if b['status'] == 'PAID')
+    total_pending = sum(b['amount'] for b in bills if b['status'] == 'UNPAID')
+    
+    return {
+        "user_id": user_id,
+        "total_paid": total_paid,
+        "total_pending": total_pending
+    }
+
 @api_router.get("/bills/{bill_id}")
 async def get_bill(bill_id: str):
     pool = await get_pool()
@@ -371,6 +445,12 @@ async def create_payment_order(bill_id: str = None, user_id: str = None):
             bill['bill_id'], bill['user_id'], order['id'], bill['amount']
         )
 
+    await log_event(
+        "PAYMENT_ORDER_CREATED", "SUCCESS",
+        f"Created Razorpay order for bill {bill_id}",
+        {"bill_id": bill_id, "user_id": user_id, "order_id": order['id'], "amount": amount_paise / 100}
+    )
+
     return {
         "order": order,
         "payment": row_to_dict(payment),
@@ -383,7 +463,7 @@ class VerifyPaymentRequest(BaseModel):
     razorpay_signature: str
 
 @api_router.post("/payments/verify")
-async def verify_payment(req: VerifyPaymentRequest):
+async def verify_payment(req: VerifyPaymentRequest, background_tasks: BackgroundTasks):
     # Verify signature
     try:
         razorpay_client.utility.verify_payment_signature({
@@ -422,6 +502,41 @@ async def verify_payment(req: VerifyPaymentRequest):
                RETURNING receipt_id, payment_id, bill_id, user_id, receipt_number, amount, created_at""",
             payment['payment_id'], payment['bill_id'], payment['user_id'], receipt_num, payment['amount']
         )
+
+        # Fire a webhook to the Admission module if this is a brochure payment or in general
+        webhook_payload = {
+            "event": "payment.success",
+            "data": {
+                "user_id": str(payment['user_id']),
+                "bill_id": str(payment['bill_id']),
+                "payment_id": str(payment['payment_id']),
+                "receipt_number": receipt_num,
+                "amount": float(payment['amount']),
+                "bill_type": bill['bill_type']
+            }
+        }
+        background_tasks.add_task(send_payment_webhook, webhook_payload)
+
+        # Fire a PATCH to the SIS module with aggregated fee totals for this student
+        if bill['bill_type'] == 'ACADEMIC':
+            fee_summary = await conn.fetch(
+                "SELECT status, amount FROM bills WHERE user_id = $1 AND bill_type = 'ACADEMIC'",
+                payment['user_id']
+            )
+            total_paid = sum(float(r['amount']) for r in fee_summary if r['status'] == 'PAID')
+            total_pending = sum(float(r['amount']) for r in fee_summary if r['status'] == 'UNPAID')
+            background_tasks.add_task(
+                send_sis_fee_update,
+                str(payment['user_id']),
+                total_paid,
+                total_pending
+            )
+
+    await log_event(
+        "PAYMENT_VERIFIED", "SUCCESS",
+        f"Payment verified for bill {str(payment['bill_id'])}",
+        {"user_id": str(payment['user_id']), "bill_id": str(payment['bill_id']), "payment_id": str(payment['payment_id']), "receipt_number": receipt_num, "amount": float(payment['amount']), "bill_type": bill['bill_type']}
+    )
 
     return {"message": "Payment verified successfully", "receipt": row_to_dict(receipt)}
 
@@ -526,10 +641,16 @@ async def create_refund(req: CreateRefundRequest, admin=Depends(get_current_admi
                RETURNING refund_id, payment_id, user_id, amount, reason, status, created_at""",
             uuid.UUID(req.payment_id), payment['user_id'], req.amount, req.reason
         )
+
+    await log_event(
+        "REFUND_CREATED", "SUCCESS",
+        f"Refund request created for payment {req.payment_id}",
+        {"payment_id": req.payment_id, "amount": req.amount, "reason": req.reason, "refund_id": str(refund['refund_id'])}
+    )
     return row_to_dict(refund)
 
 @api_router.put("/refunds/{refund_id}")
-async def update_refund(refund_id: str, req: UpdateRefundStatusRequest, admin=Depends(get_current_admin)):
+async def update_refund(refund_id: str, req: UpdateRefundStatusRequest):
     if req.status not in ('REFUNDED', 'REJECTED'):
         raise HTTPException(status_code=400, detail="Status must be REFUNDED or REJECTED")
     pool = await get_pool()
@@ -537,8 +658,32 @@ async def update_refund(refund_id: str, req: UpdateRefundStatusRequest, admin=De
         refund = await conn.fetchrow("SELECT * FROM refunds WHERE refund_id = $1", uuid.UUID(refund_id))
         if not refund:
             raise HTTPException(status_code=404, detail="Refund not found")
+
+        if req.status == 'REFUNDED' and refund['status'] != 'REFUNDED':
+            # Integrate Razorpay refund
+            payment = await conn.fetchrow("SELECT razorpay_payment_id FROM payments WHERE payment_id = $1", refund['payment_id'])
+            if not payment or not payment['razorpay_payment_id']:
+                raise HTTPException(status_code=400, detail="Associated Razorpay payment not found or uncaptured")
+            try:
+                razorpay_client.refund.create({
+                    "payment_id": payment['razorpay_payment_id'],
+                    "amount": int(float(refund['amount']) * 100),
+                    "notes": {
+                        "reason": refund['reason']
+                    }
+                })
+            except Exception as e:
+                logger.error(f"Razorpay refund failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Razorpay refund creation failed: {str(e)}")
+
         await conn.execute("UPDATE refunds SET status = $1 WHERE refund_id = $2", req.status, uuid.UUID(refund_id))
         updated = await conn.fetchrow("SELECT * FROM refunds WHERE refund_id = $1", uuid.UUID(refund_id))
+
+    await log_event(
+        "REFUND_UPDATED", "SUCCESS",
+        f"Refund {refund_id} status updated to {req.status}",
+        {"refund_id": refund_id, "new_status": req.status, "amount": float(refund['amount'])}
+    )
     return row_to_dict(updated)
 
 @api_router.get("/refunds")
@@ -607,7 +752,7 @@ async def get_dashboard_stats(academic_year: Optional[str] = None, admin=Depends
                        COUNT(*) FILTER (WHERE status = 'UNPAID') as unpaid,
                        COALESCE(SUM(amount) FILTER (WHERE status = 'PAID'), 0) as collected,
                        COALESCE(SUM(amount) FILTER (WHERE status = 'UNPAID'), 0) as pending
-                FROM bills WHERE bill_type = 'TUITION'{year_filter}
+                FROM bills WHERE bill_type = 'ACADEMIC'{year_filter}
                 GROUP BY program_name ORDER BY program_name""",
             *params
         )
@@ -667,7 +812,7 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origin_regex=".*",
     allow_methods=["*"],
     allow_headers=["*"],
 )

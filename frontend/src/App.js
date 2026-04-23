@@ -9,6 +9,8 @@ import PaymentHistory from "@/pages/PaymentHistory";
 import RefundManagement from "@/pages/RefundManagement";
 import ReceiptList from "@/pages/ReceiptList";
 import UserPortal from "@/pages/UserPortal";
+import PrintReceipt from "@/pages/PrintReceipt";
+import BrochurePayment from "@/pages/BrochurePayment";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -46,6 +48,8 @@ function AppRoutes() {
       <Route path="/admin/refunds" element={<ProtectedRoute><RefundManagement /></ProtectedRoute>} />
       <Route path="/admin/receipts" element={<ProtectedRoute><ReceiptList /></ProtectedRoute>} />
       <Route path="/user" element={<UserPortal />} />
+      <Route path="/pay/brochure" element={<BrochurePayment />} />
+      <Route path="/receipt/:id/print" element={<PrintReceipt />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

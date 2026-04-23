@@ -1,11 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Lock, Mail, AlertCircle } from "lucide-react";
+import { AlertCircle, LogIn } from "lucide-react";
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
@@ -24,82 +20,220 @@ export default function AdminLogin() {
       navigate("/admin");
     } catch (err) {
       const detail = err.response?.data?.detail;
-      setError(typeof detail === "string" ? detail : "Login failed. Please check your credentials.");
+      setError(
+        typeof detail === "string"
+          ? detail
+          : "Login failed. Please check your credentials.",
+      );
     }
     setLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F9FAFB] px-4" data-testid="admin-login-page">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-14 h-14 bg-[#002FA7] rounded-md flex items-center justify-center mx-auto mb-4">
-            <Lock className="w-7 h-7 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#111827]">Admin Portal</h1>
-          <p className="text-sm text-[#6B7280] mt-2">College ERP — Fees & Billing Module</p>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        backgroundColor: "#0f2942",
+        fontFamily: "sans-serif",
+      }}
+      data-testid="admin-login-page"
+    >
+      <div
+        style={{
+          flex: 1,
+          width: "100%",
+          maxWidth: "600px",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: "1rem",
+        }}
+      >
+        {/* PVG Branding Container */}
+        <div
+          style={{ textAlign: "center", marginBottom: "2rem", width: "100%" }}
+        >
+          <img
+            src="/images/pvgcoet-logo.jpg"
+            alt="PVG Logo Banner"
+            style={{ width: "100%", objectFit: "contain" }}
+          />
+          <h1
+            style={{
+              color: "white",
+              marginTop: "2rem",
+              marginBottom: "0.25rem",
+              fontSize: "1.75rem",
+              fontWeight: "bold",
+              letterSpacing: "-0.5px",
+            }}
+          >
+            PVG's College of Engineering
+          </h1>
+          <p style={{ color: "#d1d5db", fontSize: "1.05rem" }}>
+            Fees & Billing
+          </p>
         </div>
 
-        <Card className="border border-[#E5E7EB] shadow-none rounded-md">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold text-[#111827]">Sign In</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700" data-testid="login-error">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B7280]" />
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 border-[#E5E7EB] focus:ring-[#002FA7] rounded-md"
-                    placeholder="admin@college.com"
-                    required
-                    data-testid="login-email-input"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B7280]" />
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 border-[#E5E7EB] focus:ring-[#002FA7] rounded-md"
-                    placeholder="Enter your password"
-                    required
-                    data-testid="login-password-input"
-                  />
-                </div>
-              </div>
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-[#002FA7] hover:bg-[#002FA7]/90 text-white rounded-md font-medium transition-colors"
-                data-testid="login-submit-btn"
-              >
-                {loading ? "Signing in..." : "Sign In"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        {/* Sign In Card */}
+        <div
+          style={{
+            backgroundColor: "#f3f4f6",
+            borderRadius: "12px",
+            padding: "2rem 2.5rem",
+            width: "100%",
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.4)",
+          }}
+        >
+          <h2
+            style={{
+              display: "flex",
+              alignItems: "center",
+              color: "#1e3a8a",
+              fontSize: "1.25rem",
+              fontWeight: "600",
+              marginBottom: "2rem",
+            }}
+          >
+            <LogIn
+              size={22}
+              style={{ marginRight: "8px", transform: "scaleX(-1)" }}
+            />
+            Sign In to Your Portal
+          </h2>
 
-        <p className="text-center text-xs text-[#6B7280] mt-6">
-          Looking for student portal?{" "}
-          <a href="/user" className="text-[#002FA7] font-medium hover:underline" data-testid="user-portal-link">Access here</a>
-        </p>
+          <form onSubmit={handleSubmit}>
+            {error && (
+              <div
+                className="erp-alert erp-alert--danger"
+                style={{ marginBottom: "1.5rem", padding: "0.75rem" }}
+                data-testid="login-error"
+              >
+                <AlertCircle size={16} style={{ marginRight: "6px" }} /> {error}
+              </div>
+            )}
+
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label
+                htmlFor="email"
+                style={{
+                  display: "block",
+                  color: "#1e3a8a",
+                  fontSize: "0.85rem",
+                  fontWeight: "600",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                Email Address <span style={{ color: "#dc2626" }}>*</span>
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email address"
+                required
+                data-testid="login-email-input"
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: "6px",
+                  border: "1px solid #d1d5db",
+                  backgroundColor: "#ffffff",
+                  fontSize: "0.95rem",
+                  outline: "none",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "#1e3a8a")}
+                onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
+              />
+            </div>
+
+            <div style={{ marginBottom: "2rem" }}>
+              <label
+                htmlFor="password"
+                style={{
+                  display: "block",
+                  color: "#1e3a8a",
+                  fontSize: "0.85rem",
+                  fontWeight: "600",
+                  marginBottom: "0.5rem",
+                }}
+              >
+                Password <span style={{ color: "#dc2626" }}>*</span>
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                data-testid="login-password-input"
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: "6px",
+                  border: "1px solid #d1d5db",
+                  backgroundColor: "#ffffff",
+                  fontSize: "0.95rem",
+                  outline: "none",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "#1e3a8a")}
+                onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              data-testid="login-submit-btn"
+              style={{
+                width: "100%",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                backgroundColor: "#1e3a8a",
+                color: "white",
+                padding: "12px",
+                borderRadius: "6px",
+                fontSize: "1rem",
+                fontWeight: "600",
+                border: "none",
+                cursor: loading ? "not-allowed" : "pointer",
+                opacity: loading ? 0.7 : 1,
+                transition: "background-color 0.2s",
+              }}
+              onMouseOver={(e) =>
+                !loading && (e.currentTarget.style.backgroundColor = "#172554")
+              }
+              onMouseOut={(e) =>
+                !loading && (e.currentTarget.style.backgroundColor = "#1e3a8a")
+              }
+            >
+              <LogIn
+                size={20}
+                style={{ marginRight: "8px", transform: "scaleX(-1)" }}
+              />
+              {loading ? "Signing in..." : "Sign In"}
+            </button>
+          </form>
+        </div>
+
+        {/* Footer Text */}
+        <div
+          style={{
+            marginTop: "3rem",
+            textAlign: "center",
+            color: "#9ca3af",
+            fontSize: "0.8rem",
+          }}
+        >
+          PVG COET&M ERP v1.0 • Academic Year 2024-2026
+        </div>
       </div>
     </div>
   );

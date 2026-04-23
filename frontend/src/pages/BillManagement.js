@@ -1,50 +1,32 @@
 import React, { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import {
-  ArrowLeft, FileText, Plus, Search, Filter
-} from "lucide-react";
-
-function AdminHeader({ title, onBack }) {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  return (
-    <header className="sticky top-0 z-50 w-full border-b border-[#E5E7EB] bg-white/80 backdrop-blur-xl">
-      <div className="max-w-[1440px] mx-auto px-6 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="p-1.5 rounded-md hover:bg-[#F3F4F6] transition-colors" data-testid="back-btn">
-            <ArrowLeft className="w-5 h-5 text-[#6B7280]" />
-          </button>
-          <span className="text-sm font-bold tracking-tight text-[#111827]">{title}</span>
-        </div>
-        <span className="text-xs text-[#6B7280]">{user?.email}</span>
-      </div>
-    </header>
-  );
-}
+import AdminLayout from "@/components/AdminLayout";
+import { Plus, X } from "lucide-react";
 
 export default function BillManagement() {
-  const navigate = useNavigate();
   const [bills, setBills] = useState([]);
   const [years, setYears] = useState([]);
-  const [filters, setFilters] = useState({ academic_year: "", status: "", user_id: "" });
+  const [filters, setFilters] = useState({
+    academic_year: "",
+    status: "",
+    user_id: "",
+  });
   const [loading, setLoading] = useState(true);
   const [showGenerate, setShowGenerate] = useState(false);
-  const [genForm, setGenForm] = useState({ user_id: "", academic_year: "2024-25", program_name: "", total_course_fees: "", installments: "3" });
+  const [genForm, setGenForm] = useState({
+    user_id: "",
+    academic_year: "2024-25",
+    program_name: "",
+    total_course_fees: "",
+    installments: "3",
+  });
   const [genLoading, setGenLoading] = useState(false);
   const [genResult, setGenResult] = useState(null);
 
   useEffect(() => {
     loadYears();
     loadBills();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadYears = async () => {
@@ -58,7 +40,8 @@ export default function BillManagement() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filters.academic_year) params.append("academic_year", filters.academic_year);
+      if (filters.academic_year)
+        params.append("academic_year", filters.academic_year);
       if (filters.status) params.append("status", filters.status);
       if (filters.user_id) params.append("user_id", filters.user_id);
       const { data } = await api.get(`/bills?${params.toString()}`);
@@ -69,7 +52,10 @@ export default function BillManagement() {
     setLoading(false);
   };
 
-  useEffect(() => { loadBills(); }, [filters]);
+  useEffect(() => {
+    loadBills();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   const handleGenerate = async (e) => {
     e.preventDefault();
@@ -81,7 +67,7 @@ export default function BillManagement() {
         academic_year: genForm.academic_year,
         program_name: genForm.program_name,
         total_course_fees: parseFloat(genForm.total_course_fees),
-        installments: parseInt(genForm.installments)
+        installments: parseInt(genForm.installments),
       };
       const { data } = await api.post("/admission/generate-bills", payload);
       setGenResult(data);
@@ -89,139 +75,386 @@ export default function BillManagement() {
       setTimeout(() => {
         setShowGenerate(false);
         setGenResult(null);
-        setGenForm({ user_id: "", academic_year: "2024-25", program_name: "", total_course_fees: "", installments: "3" });
+        setGenForm({
+          user_id: "",
+          academic_year: "2024-25",
+          program_name: "",
+          total_course_fees: "",
+          installments: "3",
+        });
       }, 1500);
     } catch (err) {
-      setGenResult({ error: err.response?.data?.detail || "Failed to generate bills" });
+      setGenResult({
+        error: err.response?.data?.detail || "Failed to generate bills",
+      });
     }
     setGenLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]" data-testid="bill-management-page">
-      <AdminHeader title="Bill Management" onBack={() => navigate("/admin")} />
+    <AdminLayout title="Bill Management">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+          gap: "1rem",
+          mb: "2rem",
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: "1.5rem", color: "var(--erp-dark)" }}>
+          Bills
+        </h2>
+        <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+          <select
+            className="erp-form-control"
+            style={{ width: "150px" }}
+            value={filters.academic_year}
+            onChange={(e) =>
+              setFilters({ ...filters, academic_year: e.target.value })
+            }
+          >
+            <option value="">All Years</option>
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
 
-      <main className="max-w-[1440px] mx-auto px-6 py-8">
-        {/* Controls */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-[#111827]">Bills</h1>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Select value={filters.academic_year} onValueChange={(v) => setFilters({ ...filters, academic_year: v === "all" ? "" : v })}>
-              <SelectTrigger className="w-[150px] border-[#E5E7EB] rounded-md text-sm" data-testid="filter-year">
-                <SelectValue placeholder="All Years" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Years</SelectItem>
-                {years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={filters.status} onValueChange={(v) => setFilters({ ...filters, status: v === "all" ? "" : v })}>
-              <SelectTrigger className="w-[130px] border-[#E5E7EB] rounded-md text-sm" data-testid="filter-status">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="PAID">Paid</SelectItem>
-                <SelectItem value="UNPAID">Unpaid</SelectItem>
-              </SelectContent>
-            </Select>
-            <Dialog open={showGenerate} onOpenChange={setShowGenerate}>
-              <DialogTrigger asChild>
-                <Button className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white rounded-md text-sm" data-testid="generate-bills-btn">
-                  <Plus className="w-4 h-4 mr-1.5" /> Generate Bills
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="text-lg font-bold text-[#111827]">Generate Tuition Bills</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleGenerate} className="space-y-4 mt-2">
-                  <div className="space-y-2">
-                    <Label className="text-xs uppercase tracking-[0.1em] font-bold text-[#6B7280]">User ID (UUID)</Label>
-                    <Input value={genForm.user_id} onChange={(e) => setGenForm({ ...genForm, user_id: e.target.value })} placeholder="Leave empty for auto-generate" className="border-[#E5E7EB]" data-testid="gen-user-id" />
+          <select
+            className="erp-form-control"
+            style={{ width: "150px" }}
+            value={filters.status}
+            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+          >
+            <option value="">All Status</option>
+            <option value="PAID">Paid</option>
+            <option value="UNPAID">Unpaid</option>
+          </select>
+
+          <button
+            className="erp-btn erp-btn--primary"
+            onClick={() => setShowGenerate(true)}
+          >
+            <Plus size={16} style={{ marginRight: "6px" }} /> Generate Bills
+          </button>
+
+          {showGenerate && (
+            <div
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "100vw",
+                height: "100vh",
+                backgroundColor: "rgba(0,0,0,0.5)",
+                zIndex: 1000,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: "white",
+                  borderRadius: "12px",
+                  padding: "1.5rem",
+                  width: "100%",
+                  maxWidth: "450px",
+                  boxShadow: "0 20px 25px -5px rgba(0,0,0,0.2)",
+                  position: "relative",
+                }}
+              >
+                <button
+                  onClick={() => setShowGenerate(false)}
+                  style={{
+                    position: "absolute",
+                    top: "16px",
+                    right: "16px",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--erp-text-muted)",
+                  }}
+                >
+                  <X size={20} />
+                </button>
+                <div
+                  style={{
+                    fontSize: "1.25rem",
+                    fontWeight: "bold",
+                    marginBottom: "1.5rem",
+                    color: "var(--erp-dark)",
+                  }}
+                >
+                  Generate Academic Bills
+                </div>
+                <form onSubmit={handleGenerate}>
+                  <div className="erp-form-group">
+                    <label>User ID (UUID)</label>
+                    <input
+                      className="erp-form-control"
+                      value={genForm.user_id}
+                      onChange={(e) =>
+                        setGenForm({ ...genForm, user_id: e.target.value })
+                      }
+                      placeholder="Leave empty for auto-generate"
+                    />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label className="text-xs uppercase tracking-[0.1em] font-bold text-[#6B7280]">Academic Year</Label>
-                      <Input value={genForm.academic_year} onChange={(e) => setGenForm({ ...genForm, academic_year: e.target.value })} required className="border-[#E5E7EB]" data-testid="gen-academic-year" />
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "1rem",
+                    }}
+                  >
+                    <div className="erp-form-group">
+                      <label>
+                        Academic Year <span style={{ color: "red" }}>*</span>
+                      </label>
+                      <input
+                        className="erp-form-control"
+                        value={genForm.academic_year}
+                        onChange={(e) =>
+                          setGenForm({
+                            ...genForm,
+                            academic_year: e.target.value,
+                          })
+                        }
+                        required
+                      />
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs uppercase tracking-[0.1em] font-bold text-[#6B7280]">Program</Label>
-                      <Input value={genForm.program_name} onChange={(e) => setGenForm({ ...genForm, program_name: e.target.value })} placeholder="B.Sc CS" required className="border-[#E5E7EB]" data-testid="gen-program" />
+                    <div className="erp-form-group">
+                      <label>
+                        Program <span style={{ color: "red" }}>*</span>
+                      </label>
+                      <input
+                        className="erp-form-control"
+                        value={genForm.program_name}
+                        onChange={(e) =>
+                          setGenForm({
+                            ...genForm,
+                            program_name: e.target.value,
+                          })
+                        }
+                        placeholder="B.Sc CS"
+                        required
+                      />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label className="text-xs uppercase tracking-[0.1em] font-bold text-[#6B7280]">Total Fees (₹)</Label>
-                      <Input type="number" value={genForm.total_course_fees} onChange={(e) => setGenForm({ ...genForm, total_course_fees: e.target.value })} required min="1" className="border-[#E5E7EB]" data-testid="gen-total-fees" />
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "1rem",
+                    }}
+                  >
+                    <div className="erp-form-group">
+                      <label>
+                        Total Fees (₹) <span style={{ color: "red" }}>*</span>
+                      </label>
+                      <input
+                        type="number"
+                        className="erp-form-control"
+                        value={genForm.total_course_fees}
+                        onChange={(e) =>
+                          setGenForm({
+                            ...genForm,
+                            total_course_fees: e.target.value,
+                          })
+                        }
+                        required
+                        min="1"
+                      />
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs uppercase tracking-[0.1em] font-bold text-[#6B7280]">Installments</Label>
-                      <Input type="number" value={genForm.installments} onChange={(e) => setGenForm({ ...genForm, installments: e.target.value })} required min="1" max="12" className="border-[#E5E7EB]" data-testid="gen-installments" />
+                    <div className="erp-form-group">
+                      <label>
+                        Installments <span style={{ color: "red" }}>*</span>
+                      </label>
+                      <input
+                        type="number"
+                        className="erp-form-control"
+                        value={genForm.installments}
+                        onChange={(e) =>
+                          setGenForm({
+                            ...genForm,
+                            installments: e.target.value,
+                          })
+                        }
+                        required
+                        min="1"
+                        max="12"
+                      />
                     </div>
                   </div>
+
                   {genResult && (
-                    <div className={`p-3 rounded-md text-sm ${genResult.error ? "bg-red-50 text-red-700 border border-red-200" : "bg-green-50 text-green-700 border border-green-200"}`} data-testid="gen-result">
-                      {genResult.error ? genResult.error : `${genResult.bills?.length} bills generated (₹${genResult.per_installment} each)`}
+                    <div
+                      className={
+                        genResult.error
+                          ? "erp-alert erp-alert--danger"
+                          : "erp-alert erp-alert--success"
+                      }
+                      style={{ marginBottom: "1rem" }}
+                    >
+                      {genResult.error
+                        ? genResult.error
+                        : `${genResult.bills?.length} bills generated (₹${genResult.per_installment} each)`}
                     </div>
                   )}
-                  <Button type="submit" disabled={genLoading} className="w-full bg-[#002FA7] hover:bg-[#002FA7]/90 text-white rounded-md" data-testid="gen-submit-btn">
-                    {genLoading ? "Generating..." : "Generate Bills"}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
 
-        {/* Bills Table */}
-        <Card className="border border-[#E5E7EB] shadow-none rounded-md" data-testid="bills-table">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Bill ID</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">User ID</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Program</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Type</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Installment</th>
-                    <th className="text-right py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Amount</th>
-                    <th className="text-center py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Status</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Year</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={8} className="py-12 text-center text-[#6B7280]">Loading...</td></tr>
-                  ) : bills.length === 0 ? (
-                    <tr><td colSpan={8} className="py-12 text-center text-[#6B7280]">No bills found</td></tr>
-                  ) : (
-                    bills.map((b) => (
-                      <tr key={b.bill_id} className="border-b border-[#E5E7EB] last:border-0 hover:bg-[#F9FAFB] transition-colors" data-testid={`bill-row-${b.bill_id}`}>
-                        <td className="py-3 px-4 font-mono text-xs text-[#111827]">{b.bill_id.slice(0, 8)}...</td>
-                        <td className="py-3 px-4 font-mono text-xs text-[#6B7280]">{b.user_id.slice(0, 8)}...</td>
-                        <td className="py-3 px-4 text-[#111827]">{b.program_name || "—"}</td>
-                        <td className="py-3 px-4">
-                          <Badge variant={b.bill_type === "BROCHURE" ? "secondary" : "outline"} className="text-xs">{b.bill_type}</Badge>
-                        </td>
-                        <td className="py-3 px-4 text-[#6B7280]">{b.installment_number ? `${b.installment_number}/${b.total_installments}` : "—"}</td>
-                        <td className="py-3 px-4 text-right font-mono font-medium text-[#111827]">₹{Number(b.amount).toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-center">
-                          <Badge className={b.status === "PAID" ? "bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20 hover:bg-[#10B981]/10" : "bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20 hover:bg-[#F59E0B]/10"}>
-                            {b.status}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4 text-[#6B7280]">{b.academic_year}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                  <button
+                    type="submit"
+                    disabled={genLoading}
+                    className="erp-btn erp-btn--primary"
+                    style={{ width: "100%" }}
+                  >
+                    {genLoading ? "Generating..." : "Generate Bills"}
+                  </button>
+                </form>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </main>
-    </div>
+          )}
+        </div>
+      </div>
+
+      <div className="erp-card" style={{ marginTop: "2rem" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              textAlign: "left",
+            }}
+          >
+            <thead
+              style={{
+                borderBottom: "1px solid var(--erp-border)",
+                fontSize: "0.75rem",
+                textTransform: "uppercase",
+                color: "var(--erp-text-muted)",
+              }}
+            >
+              <tr>
+                <th style={{ padding: "12px 16px" }}>Bill ID</th>
+                <th style={{ padding: "12px 16px" }}>User Name</th>
+                <th style={{ padding: "12px 16px" }}>Program</th>
+                <th style={{ padding: "12px 16px" }}>Type</th>
+                <th style={{ padding: "12px 16px" }}>Installment</th>
+                <th style={{ padding: "12px 16px", textAlign: "right" }}>
+                  Amount
+                </th>
+                <th style={{ padding: "12px 16px", textAlign: "center" }}>
+                  Status
+                </th>
+                <th style={{ padding: "12px 16px" }}>Year</th>
+              </tr>
+            </thead>
+            <tbody style={{ fontSize: "0.875rem" }}>
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    style={{
+                      padding: "3rem",
+                      textAlign: "center",
+                      color: "var(--erp-text-muted)",
+                    }}
+                  >
+                    Loading bills...
+                  </td>
+                </tr>
+              ) : bills.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    style={{
+                      padding: "3rem",
+                      textAlign: "center",
+                      color: "var(--erp-text-muted)",
+                    }}
+                  >
+                    No bills found
+                  </td>
+                </tr>
+              ) : (
+                bills.map((b) => (
+                  <tr
+                    key={b.bill_id}
+                    style={{ borderBottom: "1px solid var(--erp-border)" }}
+                  >
+                    <td
+                      style={{
+                        padding: "12px 16px",
+                        fontFamily: "monospace",
+                        color: "var(--erp-dark)",
+                      }}
+                    >
+                      {b.bill_id.slice(0, 8)}...
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 16px",
+                        fontFamily: "monospace",
+                        color: "var(--erp-text-muted)",
+                      }}
+                    >
+                      {b.user_name}
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      {b.program_name || "—"}
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span
+                        className={`erp-badge ${b.bill_type === "BROCHURE" ? "erp-badge--primary" : "erp-badge--warning"}`}
+                      >
+                        {b.bill_type}
+                      </span>
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 16px",
+                        color: "var(--erp-text-muted)",
+                      }}
+                    >
+                      {b.installment_number
+                        ? `${b.installment_number}/${b.total_installments}`
+                        : "—"}
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 16px",
+                        textAlign: "right",
+                        fontFamily: "monospace",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      ₹{Number(b.amount).toLocaleString("en-IN")}
+                    </td>
+                    <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                      <span
+                        className={`erp-badge ${b.status === "PAID" ? "erp-badge--success" : "erp-badge--danger"}`}
+                      >
+                        {b.status}
+                      </span>
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 16px",
+                        color: "var(--erp-text-muted)",
+                      }}
+                    >
+                      {b.academic_year}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </AdminLayout>
   );
 }

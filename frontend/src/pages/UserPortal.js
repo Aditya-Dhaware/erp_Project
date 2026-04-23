@@ -1,23 +1,20 @@
 import React, { useState, useCallback } from "react";
 import api from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, FileText, CreditCard, Receipt, AlertCircle, CheckCircle } from "lucide-react";
-
-const RAZORPAY_KEY = process.env.REACT_APP_RAZORPAY_KEY_ID;
+import { Search, CreditCard, AlertCircle, CheckCircle, Printer } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 
 export default function UserPortal() {
-  const [userId, setUserId] = useState("");
+  const [searchParams] = useSearchParams();
+  const defaultUserId = searchParams.get("student_id") || searchParams.get("user_id") || "";
+
+  const [userId, setUserId] = useState(defaultUserId);
   const [bills, setBills] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [payingBillId, setPayingBillId] = useState(null);
+  const [activeTab, setActiveTab] = useState("pending");
 
   const lookupBills = useCallback(async () => {
     if (!userId.trim()) return;
@@ -36,6 +33,14 @@ export default function UserPortal() {
     }
     setLoading(false);
   }, [userId]);
+
+  // Auto-trigger search if the id is in the URL parameter
+  React.useEffect(() => {
+    if (defaultUserId) {
+      lookupBills();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handlePay = async (bill) => {
     setPayingBillId(bill.bill_id);
@@ -69,7 +74,7 @@ export default function UserPortal() {
             setPaymentStatus({ type: "info", message: "Payment cancelled." });
           }
         },
-        theme: { color: "#002FA7" }
+        theme: { color: "var(--erp-primary)" }
       };
       const rzp = new window.Razorpay(options);
       rzp.on("payment.failed", () => {
@@ -88,213 +93,217 @@ export default function UserPortal() {
   const totalPending = pendingBills.reduce((sum, b) => sum + b.amount, 0);
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]" data-testid="user-portal">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b border-[#E5E7EB] bg-white/80 backdrop-blur-xl">
-        <div className="max-w-[960px] mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-[#002FA7] rounded flex items-center justify-center">
-              <CreditCard className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-sm font-bold tracking-tight text-[#111827]">Student Fee Portal</span>
+    <>
+      <header className="erp-topbar" style={{ paddingLeft: '24px', zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '32px', height: '32px', backgroundColor: 'var(--erp-primary)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CreditCard color="white" size={16} />
           </div>
-          <a href="/" className="text-xs text-[#002FA7] font-medium hover:underline" data-testid="admin-link">Admin Login</a>
+          <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--erp-dark)' }}>Student Fee Portal</span>
+        </div>
+        <div style={{ marginLeft: 'auto' }}>
+          <a href="/admin" style={{ fontSize: '13px', color: 'var(--erp-primary)', fontWeight: '500', textDecoration: 'none' }} data-testid="admin-link">Admin Login</a>
         </div>
       </header>
 
-      <main className="max-w-[960px] mx-auto px-6 py-8">
-        {/* Lookup */}
-        <Card className="border border-[#E5E7EB] shadow-none rounded-md mb-8" data-testid="user-lookup-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-bold text-[#111827]">Look Up Your Fees</CardTitle>
-            <p className="text-sm text-[#6B7280]">Enter your User ID to view bills, make payments, and download receipts.</p>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-3">
-              <Input
+      <main className="erp-main" data-erp-page="User Portal" style={{ maxWidth: '960px', margin: '0 auto', marginLeft: 'auto', paddingTop: '2rem' }}>
+        
+        <div className="erp-card" style={{ marginBottom: '2rem' }}>
+          <div className="erp-card__header">
+            <div>
+              <div className="erp-card__title">Look Up Your Fees</div>
+              <div className="erp-card__subtitle">Enter your User ID to view bills, make payments, and download receipts.</div>
+            </div>
+          </div>
+          <div className="erp-card__body">
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <input
+                type="text"
+                className="erp-form-control"
+                style={{ flex: 1, fontFamily: 'monospace' }}
                 value={userId}
                 onChange={(e) => setUserId(e.target.value)}
                 placeholder="Enter your User ID (UUID)"
-                className="border-[#E5E7EB] font-mono text-sm flex-1"
-                data-testid="user-id-input"
                 onKeyDown={(e) => e.key === "Enter" && lookupBills()}
               />
-              <Button onClick={lookupBills} disabled={loading} className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white rounded-md" data-testid="lookup-btn">
-                <Search className="w-4 h-4 mr-1.5" />
-                {loading ? "Loading..." : "Look Up"}
-              </Button>
+              <button onClick={lookupBills} disabled={loading} className="erp-btn erp-btn--primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Search size={16} /> {loading ? "Loading..." : "Look Up"}
+              </button>
             </div>
-
-            {/* Sample user IDs hint */}
-            <div className="mt-3 text-xs text-[#6B7280]">
-              <span className="font-medium">Sample IDs:</span>{" "}
-              <button onClick={() => setUserId("a1111111-1111-1111-1111-111111111111")} className="text-[#002FA7] hover:underline font-mono" data-testid="sample-id-1">a1111111...</button>,{" "}
-              <button onClick={() => setUserId("a2222222-2222-2222-2222-222222222222")} className="text-[#002FA7] hover:underline font-mono" data-testid="sample-id-2">a2222222...</button>,{" "}
-              <button onClick={() => setUserId("a3333333-3333-3333-3333-333333333333")} className="text-[#002FA7] hover:underline font-mono" data-testid="sample-id-3">a3333333...</button>
+            <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--erp-text-muted)' }}>
+              <span style={{ fontWeight: '500' }}>Sample IDs:</span>{" "}
+              <button className="erp-btn erp-btn--ghost" style={{ padding: '0 4px', fontSize: '13px', fontFamily: 'monospace' }} onClick={() => setUserId("a1111111-1111-1111-1111-111111111111")}>a1111111...</button>,{" "}
+              <button className="erp-btn erp-btn--ghost" style={{ padding: '0 4px', fontSize: '13px', fontFamily: 'monospace' }} onClick={() => setUserId("a2222222-2222-2222-2222-222222222222")}>a2222222...</button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Payment Status */}
         {paymentStatus && (
-          <div className={`mb-6 p-4 rounded-md flex items-center gap-3 text-sm ${
-            paymentStatus.type === "success" ? "bg-green-50 border border-green-200 text-green-700" :
-            paymentStatus.type === "error" ? "bg-red-50 border border-red-200 text-red-700" :
-            "bg-blue-50 border border-blue-200 text-blue-700"
-          }`} data-testid="payment-status">
-            {paymentStatus.type === "success" ? <CheckCircle className="w-5 h-5 shrink-0" /> : <AlertCircle className="w-5 h-5 shrink-0" />}
-            <span>{paymentStatus.message}</span>
+          <div className={`erp-alert ${paymentStatus.type === "success" ? "erp-alert--success" : paymentStatus.type === "error" ? "erp-alert--danger" : "erp-alert--info"}`} style={{ marginBottom: '1.5rem' }}>
+            {paymentStatus.type === "success" ? <CheckCircle size={16} style={{marginRight: 8}}/> : <AlertCircle size={16} style={{marginRight: 8}}/>}
+            {paymentStatus.message}
           </div>
         )}
 
         {searched && !loading && (
           <>
-            {/* Summary */}
             {bills.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6" data-testid="user-summary">
-                <Card className="border border-[#E5E7EB] shadow-none rounded-md">
-                  <CardContent className="p-4">
-                    <p className="text-xs tracking-[0.15em] uppercase font-bold text-[#6B7280]">Total Bills</p>
-                    <p className="text-xl font-bold text-[#111827] mt-1">{bills.length}</p>
-                  </CardContent>
-                </Card>
-                <Card className="border border-[#E5E7EB] shadow-none rounded-md">
-                  <CardContent className="p-4">
-                    <p className="text-xs tracking-[0.15em] uppercase font-bold text-[#6B7280]">Pending Amount</p>
-                    <p className="text-xl font-bold text-[#F59E0B] mt-1">₹{totalPending.toLocaleString('en-IN')}</p>
-                  </CardContent>
-                </Card>
-                <Card className="border border-[#E5E7EB] shadow-none rounded-md">
-                  <CardContent className="p-4">
-                    <p className="text-xs tracking-[0.15em] uppercase font-bold text-[#6B7280]">Receipts</p>
-                    <p className="text-xl font-bold text-[#10B981] mt-1">{receipts.length}</p>
-                  </CardContent>
-                </Card>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div className="erp-card" style={{ textAlign: 'center', padding: '1rem' }}>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', color: 'var(--erp-text-muted)', letterSpacing: '0.1em' }}>Total Bills</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--erp-dark)', marginTop: '4px' }}>{bills.length}</div>
+                </div>
+                <div className="erp-card" style={{ textAlign: 'center', padding: '1rem' }}>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', color: 'var(--erp-text-muted)', letterSpacing: '0.1em' }}>Pending Amount</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--erp-warning)', marginTop: '4px' }}>₹{totalPending.toLocaleString('en-IN')}</div>
+                </div>
+                <div className="erp-card" style={{ textAlign: 'center', padding: '1rem' }}>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', color: 'var(--erp-text-muted)', letterSpacing: '0.1em' }}>Receipts</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--erp-success)', marginTop: '4px' }}>{receipts.length}</div>
+                </div>
               </div>
             )}
 
-            <Tabs defaultValue="pending" className="space-y-4">
-              <TabsList className="border border-[#E5E7EB] bg-white rounded-md p-1">
-                <TabsTrigger value="pending" className="text-sm rounded" data-testid="tab-pending">
-                  Pending ({pendingBills.length})
-                </TabsTrigger>
-                <TabsTrigger value="paid" className="text-sm rounded" data-testid="tab-paid">
-                  Paid ({paidBills.length})
-                </TabsTrigger>
-                <TabsTrigger value="receipts" className="text-sm rounded" data-testid="tab-receipts">
-                  Receipts ({receipts.length})
-                </TabsTrigger>
-              </TabsList>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem', borderBottom: '1px solid var(--erp-border)' }}>
+              <button 
+                onClick={() => setActiveTab('pending')}
+                style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === 'pending' ? '2px solid var(--erp-primary)' : '2px solid transparent', color: activeTab === 'pending' ? 'var(--erp-primary)' : 'var(--erp-text-muted)', fontWeight: activeTab === 'pending' ? 'bold' : 'normal', cursor: 'pointer' }}
+              >
+                Pending ({pendingBills.length})
+              </button>
+              <button 
+                onClick={() => setActiveTab('paid')}
+                style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === 'paid' ? '2px solid var(--erp-primary)' : '2px solid transparent', color: activeTab === 'paid' ? 'var(--erp-primary)' : 'var(--erp-text-muted)', fontWeight: activeTab === 'paid' ? 'bold' : 'normal', cursor: 'pointer' }}
+              >
+                Paid ({paidBills.length})
+              </button>
+              <button 
+                onClick={() => setActiveTab('receipts')}
+                style={{ padding: '8px 16px', background: 'transparent', border: 'none', borderBottom: activeTab === 'receipts' ? '2px solid var(--erp-primary)' : '2px solid transparent', color: activeTab === 'receipts' ? 'var(--erp-primary)' : 'var(--erp-text-muted)', fontWeight: activeTab === 'receipts' ? 'bold' : 'normal', cursor: 'pointer' }}
+              >
+                Receipts ({receipts.length})
+              </button>
+            </div>
 
-              <TabsContent value="pending">
+            {activeTab === 'pending' && (
+              <div>
                 {pendingBills.length === 0 ? (
-                  <Card className="border border-[#E5E7EB] shadow-none rounded-md">
-                    <CardContent className="py-12 text-center text-[#6B7280]">
-                      <CheckCircle className="w-10 h-10 mx-auto mb-3 text-[#10B981]" />
-                      <p className="font-medium">All bills are paid!</p>
-                    </CardContent>
-                  </Card>
+                  <div className="erp-card" style={{ padding: '3rem', textAlign: 'center' }}>
+                    <CheckCircle size={40} color="var(--erp-success)" style={{ margin: '0 auto 12px auto' }} />
+                    <p style={{ color: 'var(--erp-dark)', fontWeight: '500' }}>All bills are paid!</p>
+                  </div>
                 ) : (
-                  <div className="space-y-3">
-                    {pendingBills.map((b) => (
-                      <Card key={b.bill_id} className="border border-[#E5E7EB] shadow-none rounded-md" data-testid={`pending-bill-${b.bill_id}`}>
-                        <CardContent className="p-4 flex items-center justify-between">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {pendingBills.map(b => (
+                      <div key={b.bill_id} className="erp-card">
+                        <div className="erp-card__body" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="outline" className="text-xs">{b.bill_type}</Badge>
-                              <span className="text-sm font-medium text-[#111827]">{b.program_name || "Brochure"}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                              <span className="erp-badge erp-badge--primary">{b.bill_type}</span>
+                              <span style={{ fontWeight: '500', color: 'var(--erp-dark)' }}>{b.program_name || "Brochure"}</span>
                             </div>
-                            <p className="text-xs text-[#6B7280]">
+                            <div style={{ fontSize: '12px', color: 'var(--erp-text-muted)' }}>
                               {b.installment_number ? `Installment ${b.installment_number} of ${b.total_installments}` : "One-time fee"} — {b.academic_year}
-                            </p>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-4">
-                            <span className="text-lg font-bold font-mono text-[#111827]">₹{Number(b.amount).toLocaleString('en-IN')}</span>
-                            <Button
-                              onClick={() => handlePay(b)}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <span style={{ fontSize: '1.25rem', fontWeight: 'bold', fontFamily: 'monospace' }}>₹{Number(b.amount).toLocaleString('en-IN')}</span>
+                            <button 
+                              onClick={() => handlePay(b)} 
                               disabled={payingBillId === b.bill_id}
-                              className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white rounded-md text-sm"
-                              data-testid={`pay-btn-${b.bill_id}`}
+                              className="erp-btn erp-btn--primary"
                             >
-                              <CreditCard className="w-4 h-4 mr-1.5" />
                               {payingBillId === b.bill_id ? "Processing..." : "Pay Now"}
-                            </Button>
+                            </button>
                           </div>
-                        </CardContent>
-                      </Card>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
-              </TabsContent>
+              </div>
+            )}
 
-              <TabsContent value="paid">
+            {activeTab === 'paid' && (
+              <div>
                 {paidBills.length === 0 ? (
-                  <Card className="border border-[#E5E7EB] shadow-none rounded-md">
-                    <CardContent className="py-12 text-center text-[#6B7280]">No paid bills yet.</CardContent>
-                  </Card>
+                  <div className="erp-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--erp-text-muted)' }}>
+                    No paid bills yet.
+                  </div>
                 ) : (
-                  <div className="space-y-3">
-                    {paidBills.map((b) => (
-                      <Card key={b.bill_id} className="border border-[#E5E7EB] shadow-none rounded-md" data-testid={`paid-bill-${b.bill_id}`}>
-                        <CardContent className="p-4 flex items-center justify-between">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {paidBills.map(b => (
+                      <div key={b.bill_id} className="erp-card">
+                        <div className="erp-card__body" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="outline" className="text-xs">{b.bill_type}</Badge>
-                              <span className="text-sm font-medium text-[#111827]">{b.program_name || "Brochure"}</span>
-                              <Badge className="bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20 hover:bg-[#10B981]/10 text-xs">PAID</Badge>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                              <span className="erp-badge erp-badge--primary">{b.bill_type}</span>
+                              <span style={{ fontWeight: '500', color: 'var(--erp-dark)' }}>{b.program_name || "Brochure"}</span>
+                              <span className="erp-badge erp-badge--success">PAID</span>
                             </div>
-                            <p className="text-xs text-[#6B7280]">
+                            <div style={{ fontSize: '12px', color: 'var(--erp-text-muted)' }}>
                               {b.installment_number ? `Installment ${b.installment_number} of ${b.total_installments}` : "One-time fee"} — {b.academic_year}
-                            </p>
-                          </div>
-                          <span className="text-lg font-bold font-mono text-[#10B981]">₹{Number(b.amount).toLocaleString('en-IN')}</span>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="receipts">
-                {receipts.length === 0 ? (
-                  <Card className="border border-[#E5E7EB] shadow-none rounded-md">
-                    <CardContent className="py-12 text-center text-[#6B7280]">No receipts yet.</CardContent>
-                  </Card>
-                ) : (
-                  <div className="space-y-3">
-                    {receipts.map((r) => (
-                      <Card key={r.receipt_id} className="border border-[#E5E7EB] shadow-none rounded-md" data-testid={`receipt-card-${r.receipt_id}`}>
-                        <CardContent className="p-4 flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <Receipt className="w-4 h-4 text-[#002FA7]" />
-                              <span className="text-sm font-mono font-medium text-[#002FA7]">{r.receipt_number}</span>
                             </div>
-                            <p className="text-xs text-[#6B7280]">
-                              {r.program_name || "Brochure"} — {r.bill_type} {r.installment_number ? `(Inst. ${r.installment_number})` : ""} — {new Date(r.created_at).toLocaleDateString()}
-                            </p>
                           </div>
-                          <span className="text-lg font-bold font-mono text-[#111827]">₹{Number(r.amount).toLocaleString('en-IN')}</span>
-                        </CardContent>
-                      </Card>
+                          <span style={{ fontSize: '1.25rem', fontWeight: 'bold', fontFamily: 'monospace', color: 'var(--erp-success)' }}>₹{Number(b.amount).toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
-              </TabsContent>
-            </Tabs>
+              </div>
+            )}
+
+            {activeTab === 'receipts' && (
+              <div>
+                {receipts.length === 0 ? (
+                  <div className="erp-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--erp-text-muted)' }}>
+                    No receipts generated yet.
+                  </div>
+                ) : (
+                  <div className="erp-card">
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <thead style={{ borderBottom: '1px solid var(--erp-border)', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--erp-text-muted)' }}>
+                          <tr>
+                            <th style={{ padding: '12px 16px' }}>Receipt #</th>
+                            <th style={{ padding: '12px 16px' }}>Fee Type</th>
+                            <th style={{ padding: '12px 16px' }}>Academic Year</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'right' }}>Amount</th>
+                            <th style={{ padding: '12px 16px' }}>Date</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'center' }}>Print</th>
+                          </tr>
+                        </thead>
+                        <tbody style={{ fontSize: '0.875rem' }}>
+                          {receipts.map(r => (
+                            <tr key={r.receipt_id} style={{ borderBottom: '1px solid var(--erp-border)' }}>
+                              <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: 'var(--erp-primary)', fontWeight: 'bold' }}>{r.receipt_number}</td>
+                              <td style={{ padding: '12px 16px' }}>{r.bill_type}</td>
+                              <td style={{ padding: '12px 16px', color: 'var(--erp-text-muted)' }}>{r.academic_year}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 'bold' }}>₹{Number(r.amount).toLocaleString('en-IN')}</td>
+                              <td style={{ padding: '12px 16px', color: 'var(--erp-text-muted)', fontSize: '0.8rem' }}>{new Date(r.created_at).toLocaleDateString()}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                <button
+                                  onClick={() => window.open(`/receipt/${r.receipt_id}/print`, '_blank')}
+                                  className="erp-btn erp-btn--ghost"
+                                  style={{ padding: '8px' }}
+                                  title="Print / Download PDF"
+                                >
+                                  <Printer size={16} color="var(--erp-primary)" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
-
-        {searched && !loading && bills.length === 0 && (
-          <Card className="border border-[#E5E7EB] shadow-none rounded-md">
-            <CardContent className="py-12 text-center text-[#6B7280]">
-              <Search className="w-10 h-10 mx-auto mb-3 text-[#6B7280]/50" />
-              <p className="font-medium">No records found</p>
-              <p className="text-sm mt-1">Please check the User ID and try again.</p>
-            </CardContent>
-          </Card>
-        )}
       </main>
-    </div>
+    </>
   );
 }

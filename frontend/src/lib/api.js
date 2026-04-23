@@ -5,7 +5,10 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const api = axios.create({
   baseURL: `${BACKEND_URL}/api`,
   withCredentials: true,
-  headers: { "Content-Type": "application/json" },
+  headers: { 
+    "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "any"
+  },
 });
 
 // Add token to requests

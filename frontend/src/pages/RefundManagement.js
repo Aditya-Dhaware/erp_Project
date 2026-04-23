@@ -1,35 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
-import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, RefreshCw, Plus } from "lucide-react";
-
-function AdminHeader({ title, onBack }) {
-  const { user } = useAuth();
-  return (
-    <header className="sticky top-0 z-50 w-full border-b border-[#E5E7EB] bg-white/80 backdrop-blur-xl">
-      <div className="max-w-[1440px] mx-auto px-6 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="p-1.5 rounded-md hover:bg-[#F3F4F6] transition-colors" data-testid="back-btn">
-            <ArrowLeft className="w-5 h-5 text-[#6B7280]" />
-          </button>
-          <span className="text-sm font-bold tracking-tight text-[#111827]">{title}</span>
-        </div>
-        <span className="text-xs text-[#6B7280]">{user?.email}</span>
-      </div>
-    </header>
-  );
-}
+import AdminLayout from "@/components/AdminLayout";
+import { Plus, X } from "lucide-react";
 
 export default function RefundManagement() {
-  const navigate = useNavigate();
   const [refunds, setRefunds] = useState([]);
   const [years, setYears] = useState([]);
   const [academicYear, setAcademicYear] = useState("");
@@ -38,9 +12,14 @@ export default function RefundManagement() {
   const [createForm, setCreateForm] = useState({ payment_id: "", amount: "", reason: "" });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [actionLoading, setActionLoading] = useState(null);
+  const [actionError, setActionError] = useState("");
 
   useEffect(() => { loadYears(); }, []);
-  useEffect(() => { loadRefunds(); }, [academicYear]);
+  useEffect(() => { 
+    loadRefunds(); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [academicYear]);
 
   const loadYears = async () => {
     try { const { data } = await api.get("/dashboard/academic-years"); setYears(data); } catch {}
@@ -76,124 +55,134 @@ export default function RefundManagement() {
   };
 
   const handleUpdateStatus = async (refundId, status) => {
+    setActionLoading(refundId);
+    setActionError("");
     try {
       await api.put(`/refunds/${refundId}`, { status });
       loadRefunds();
     } catch (err) {
       console.error(err);
+      setActionError(err.response?.data?.detail || "Failed to update refund status");
     }
+    setActionLoading(null);
   };
 
+  const getStatusBadge = (status) => {
+    if (status === "REFUNDED") return "erp-badge--success";
+    if (status === "PENDING") return "erp-badge--warning";
+    return "erp-badge--danger";
+  }
+
   return (
-    <div className="min-h-screen bg-[#F9FAFB]" data-testid="refund-management-page">
-      <AdminHeader title="Refund Management" onBack={() => navigate("/admin")} />
+    <AdminLayout title="Refund Management">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+        <h2 style={{ margin: 0, fontSize: '1.5rem', color: 'var(--erp-dark)' }}>Refunds</h2>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <select 
+            className="erp-form-control" 
+            style={{ width: '150px' }}
+            value={academicYear} 
+            onChange={(e) => setAcademicYear(e.target.value)}
+          >
+            <option value="">All Years</option>
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          
+          <button className="erp-btn erp-btn--primary" onClick={() => setShowCreate(true)}>
+            <Plus size={16} style={{ marginRight: '6px' }} /> New Refund
+          </button>
 
-      <main className="max-w-[1440px] mx-auto px-6 py-8">
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-[#111827]">Refunds</h1>
-          <div className="flex items-center gap-3">
-            <Select value={academicYear} onValueChange={(v) => setAcademicYear(v === "all" ? "" : v)}>
-              <SelectTrigger className="w-[150px] border-[#E5E7EB] rounded-md text-sm" data-testid="filter-year">
-                <SelectValue placeholder="All Years" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Years</SelectItem>
-                {years.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Dialog open={showCreate} onOpenChange={setShowCreate}>
-              <DialogTrigger asChild>
-                <Button className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white rounded-md text-sm" data-testid="create-refund-btn">
-                  <Plus className="w-4 h-4 mr-1.5" /> New Refund
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="text-lg font-bold text-[#111827]">Create Refund</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleCreate} className="space-y-4 mt-2">
-                  <div className="space-y-2">
-                    <Label className="text-xs uppercase tracking-[0.1em] font-bold text-[#6B7280]">Payment ID (UUID)</Label>
-                    <Input value={createForm.payment_id} onChange={(e) => setCreateForm({ ...createForm, payment_id: e.target.value })} required className="border-[#E5E7EB] font-mono text-sm" data-testid="refund-payment-id" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs uppercase tracking-[0.1em] font-bold text-[#6B7280]">Amount (₹)</Label>
-                    <Input type="number" value={createForm.amount} onChange={(e) => setCreateForm({ ...createForm, amount: e.target.value })} required min="1" className="border-[#E5E7EB]" data-testid="refund-amount" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs uppercase tracking-[0.1em] font-bold text-[#6B7280]">Reason</Label>
-                    <Input value={createForm.reason} onChange={(e) => setCreateForm({ ...createForm, reason: e.target.value })} required className="border-[#E5E7EB]" data-testid="refund-reason" />
-                  </div>
-                  {createError && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700" data-testid="refund-error">{createError}</div>
-                  )}
-                  <Button type="submit" disabled={createLoading} className="w-full bg-[#002FA7] hover:bg-[#002FA7]/90 text-white rounded-md" data-testid="refund-submit-btn">
-                    {createLoading ? "Creating..." : "Create Refund"}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-
-        <Card className="border border-[#E5E7EB] shadow-none rounded-md" data-testid="refunds-table">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#E5E7EB] bg-[#F9FAFB]">
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Refund ID</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">User ID</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Program</th>
-                    <th className="text-right py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Amount</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Reason</th>
-                    <th className="text-center py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Status</th>
-                    <th className="text-center py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Actions</th>
-                    <th className="text-left py-3 px-4 text-xs tracking-[0.1em] uppercase font-bold text-[#6B7280]">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr><td colSpan={8} className="py-12 text-center text-[#6B7280]">Loading...</td></tr>
-                  ) : refunds.length === 0 ? (
-                    <tr><td colSpan={8} className="py-12 text-center text-[#6B7280]">No refunds found</td></tr>
-                  ) : (
-                    refunds.map((r) => (
-                      <tr key={r.refund_id} className="border-b border-[#E5E7EB] last:border-0 hover:bg-[#F9FAFB] transition-colors" data-testid={`refund-row-${r.refund_id}`}>
-                        <td className="py-3 px-4 font-mono text-xs text-[#111827]">{r.refund_id.slice(0, 8)}...</td>
-                        <td className="py-3 px-4 font-mono text-xs text-[#6B7280]">{r.user_id.slice(0, 8)}...</td>
-                        <td className="py-3 px-4 text-[#111827]">{r.program_name || "—"}</td>
-                        <td className="py-3 px-4 text-right font-mono font-medium text-[#111827]">₹{Number(r.amount).toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-4 text-[#6B7280] max-w-[200px] truncate">{r.reason}</td>
-                        <td className="py-3 px-4 text-center">
-                          <Badge className={
-                            r.status === "REFUNDED" ? "bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20 hover:bg-[#10B981]/10" :
-                            r.status === "PENDING" ? "bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20 hover:bg-[#F59E0B]/10" :
-                            "bg-[#EF4444]/10 text-[#EF4444] border-[#EF4444]/20 hover:bg-[#EF4444]/10"
-                          }>{r.status}</Badge>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {r.status === "PENDING" && (
-                            <div className="flex items-center gap-1 justify-center">
-                              <Button size="sm" variant="ghost" className="text-xs text-[#10B981] hover:text-[#10B981] hover:bg-[#10B981]/10 h-7 px-2" onClick={() => handleUpdateStatus(r.refund_id, "REFUNDED")} data-testid={`approve-refund-${r.refund_id}`}>
-                                Approve
-                              </Button>
-                              <Button size="sm" variant="ghost" className="text-xs text-[#EF4444] hover:text-[#EF4444] hover:bg-[#EF4444]/10 h-7 px-2" onClick={() => handleUpdateStatus(r.refund_id, "REJECTED")} data-testid={`reject-refund-${r.refund_id}`}>
-                                Reject
-                              </Button>
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-[#6B7280] text-xs">{new Date(r.created_at).toLocaleDateString()}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+          {showCreate && (
+            <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '1.5rem', width: '100%', maxWidth: '450px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)', position: 'relative' }}>
+                <button onClick={() => setShowCreate(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--erp-text-muted)' }}>
+                  <X size={20} />
+                </button>
+                <div style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1.5rem', color: 'var(--erp-dark)' }}>
+                  Create Refund
+                </div>
+                <form onSubmit={handleCreate}>
+                <div className="erp-form-group">
+                  <label>Payment ID (UUID) <span style={{color: 'red'}}>*</span></label>
+                  <input className="erp-form-control" value={createForm.payment_id} onChange={(e) => setCreateForm({ ...createForm, payment_id: e.target.value })} required />
+                </div>
+                <div className="erp-form-group">
+                  <label>Amount (₹) <span style={{color: 'red'}}>*</span></label>
+                  <input type="number" className="erp-form-control" value={createForm.amount} onChange={(e) => setCreateForm({ ...createForm, amount: e.target.value })} required min="1" />
+                </div>
+                <div className="erp-form-group">
+                  <label>Reason <span style={{color: 'red'}}>*</span></label>
+                  <input className="erp-form-control" value={createForm.reason} onChange={(e) => setCreateForm({ ...createForm, reason: e.target.value })} required />
+                </div>
+                {createError && (
+                  <div className="erp-alert erp-alert--danger" style={{ marginBottom: '1rem' }}>{createError}</div>
+                )}
+                <button type="submit" disabled={createLoading} className="erp-btn erp-btn--primary" style={{ width: '100%' }}>
+                  {createLoading ? "Creating..." : "Create Refund"}
+                </button>
+              </form>
             </div>
-          </CardContent>
-        </Card>
-      </main>
-    </div>
+           </div>
+          )}
+        </div>
+      </div>
+
+      <div className="erp-card">
+        <div style={{ overflowX: 'auto' }}>
+          {actionError && (
+            <div className="erp-alert erp-alert--danger" style={{ margin: '1rem' }}>
+              Error: {actionError}
+            </div>
+          )}
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead style={{ borderBottom: '1px solid var(--erp-border)', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--erp-text-muted)' }}>
+              <tr>
+                <th style={{ padding: '12px 16px' }}>Refund ID</th>
+                <th style={{ padding: '12px 16px' }}>User ID</th>
+                <th style={{ padding: '12px 16px' }}>Program</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Amount</th>
+                <th style={{ padding: '12px 16px' }}>Reason</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Status</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Actions</th>
+                <th style={{ padding: '12px 16px' }}>Date</th>
+              </tr>
+            </thead>
+            <tbody style={{ fontSize: '0.875rem' }}>
+              {loading ? (
+                <tr><td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: 'var(--erp-text-muted)' }}>Loading refunds...</td></tr>
+              ) : refunds.length === 0 ? (
+                <tr><td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: 'var(--erp-text-muted)' }}>No refunds found</td></tr>
+              ) : (
+                refunds.map((r) => (
+                  <tr key={r.refund_id} style={{ borderBottom: '1px solid var(--erp-border)' }}>
+                    <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: 'var(--erp-dark)' }}>{r.refund_id.slice(0, 8)}...</td>
+                    <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: 'var(--erp-text-muted)' }}>{r.user_id.slice(0, 8)}...</td>
+                    <td style={{ padding: '12px 16px' }}>{r.program_name || "—"}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 'bold' }}>₹{Number(r.amount).toLocaleString('en-IN')}</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--erp-text-muted)', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.reason}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <span className={`erp-badge ${getStatusBadge(r.status)}`}>{r.status}</span>
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      {r.status === "PENDING" && (
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                          <button disabled={actionLoading === r.refund_id} className="erp-btn erp-btn--success" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleUpdateStatus(r.refund_id, "REFUNDED")}>
+                            {actionLoading === r.refund_id ? "..." : "Approve"}
+                          </button>
+                          <button disabled={actionLoading === r.refund_id} className="erp-btn erp-btn--danger" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleUpdateStatus(r.refund_id, "REJECTED")}>
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 16px', color: 'var(--erp-text-muted)', fontSize: '0.8rem' }}>{new Date(r.created_at).toLocaleDateString()}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </AdminLayout>
   );
 }

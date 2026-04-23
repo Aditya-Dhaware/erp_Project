@@ -40,8 +40,11 @@ async def init_db():
                 bill_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 user_id UUID NOT NULL,
                 academic_year VARCHAR(20) NOT NULL,
+                user_name VARCHAR(255),
+                user_email VARCHAR(255),
                 program_name VARCHAR(255),
-                bill_type VARCHAR(50) NOT NULL DEFAULT 'TUITION',
+                user_class VARCHAR(50),
+                bill_type VARCHAR(50) NOT NULL DEFAULT 'ACADEMIC',
                 amount NUMERIC(12, 2) NOT NULL,
                 status VARCHAR(20) NOT NULL DEFAULT 'UNPAID',
                 installment_number INTEGER,
@@ -82,6 +85,15 @@ async def init_db():
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
 
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                log_id VARCHAR(50) PRIMARY KEY,
+                event_name VARCHAR(100) NOT NULL,
+                status VARCHAR(50) NOT NULL,
+                description TEXT,
+                metadata JSONB,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
             CREATE INDEX IF NOT EXISTS idx_bills_user_id ON bills(user_id);
             CREATE INDEX IF NOT EXISTS idx_bills_academic_year ON bills(academic_year);
             CREATE INDEX IF NOT EXISTS idx_bills_status ON bills(status);
@@ -89,5 +101,7 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);
             CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id);
             CREATE INDEX IF NOT EXISTS idx_refunds_user_id ON refunds(user_id);
+            CREATE INDEX IF NOT EXISTS idx_audit_logs_event ON audit_logs(event_name);
+            CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);
         ''')
     logger.info("Database tables initialized successfully")
