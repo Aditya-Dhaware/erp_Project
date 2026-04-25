@@ -81,6 +81,7 @@ webpackConfig.devServer = (devServerConfig) => {
     };
   }
 
+  devServerConfig.historyApiFallback = true;
   return devServerConfig;
 };
 
